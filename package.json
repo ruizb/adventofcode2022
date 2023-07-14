@@ -2,6 +2,7 @@
   "name": "adventofcode2022",
   "version": "0.0.1",
   "description": "Advent of code 2022 puzzles using Effect TS.",
+  "type": "module",
   "scripts": {
     "build": "tsc",
     "test": "vitest run",
