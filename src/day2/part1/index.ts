@@ -1,5 +1,5 @@
 import { Effect, List, Number, String, Tuple, pipe } from 'effect'
-import { parseFile, parseFileLines } from '../../common/index.js'
+import { InputProvider } from '../../common/index.js'
 
 export enum StandardShape {
   Rock = 'A',
@@ -51,21 +51,19 @@ const scoresMatrix = {
 
 export const parseLine = (
   line: string
-): Effect.Effect<never, string, [string, string]> => {
-  return pipe(
-    Effect.succeed(line),
+): Effect.Effect<never, string, [string, string]> =>
+  Effect.succeed(line).pipe(
     Effect.map(String.split(' ')),
     Effect.filterOrFail(
       (elements): elements is [string, string] => elements.length === 2,
       elements => `More than 2 elements on the same line: ${elements}`
     )
   )
-}
 
 const parseShapesPair = (
   shapesPair: [string, string]
-): Effect.Effect<never, string, [StandardShape, EncryptedShape]> => {
-  return pipe(
+): Effect.Effect<never, string, [StandardShape, EncryptedShape]> =>
+  pipe(
     shapesPair,
     Tuple.mapBoth({
       onFirst: rawShape =>
@@ -89,22 +87,14 @@ const parseShapesPair = (
     }),
     _ => Effect.all(_)
   )
-}
 
 const parseStrategyGuide = (
-  fileContents: string
-): Effect.Effect<never, string, List.List<[StandardShape, EncryptedShape]>> =>
-  pipe(
-    Effect.succeed(fileContents),
-    Effect.map(parseFileLines),
+  lines: string[]
+): Effect.Effect<never, string, [StandardShape, EncryptedShape][]> =>
+  Effect.succeed(lines).pipe(
     Effect.flatMap(lines =>
-      pipe(
-        lines,
-        List.map(line =>
-          pipe(line, parseLine, Effect.flatMap(parseShapesPair))
-        ),
-        _ => Effect.all(_),
-        Effect.map(List.fromIterable)
+      Effect.all(
+        lines.map(line => parseLine(line).pipe(Effect.flatMap(parseShapesPair)))
       )
     )
   )
@@ -118,12 +108,14 @@ const computeScore = ([standard, encrypted]: [
 }
 
 export const computeFinalScore = (
-  strategyGuide: List.List<[StandardShape, EncryptedShape]>
-): number => pipe(strategyGuide, List.map(computeScore), Number.sumAll)
+  strategyGuide: [StandardShape, EncryptedShape][]
+): number =>
+  List.fromIterable(strategyGuide).pipe(List.map(computeScore), Number.sumAll)
 
-export const program = pipe(
-  new URL('input.txt', import.meta.url),
-  parseFile,
+export const program = InputProvider.pipe(
+  Effect.flatMap(inputProvider =>
+    inputProvider.get(new URL('input.txt', import.meta.url))
+  ),
   Effect.flatMap(parseStrategyGuide),
   Effect.map(computeFinalScore)
 )

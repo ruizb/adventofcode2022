@@ -1,5 +1,5 @@
 import { Effect, List, Tuple, pipe } from 'effect'
-import { parseFile, parseFileLines } from '../../common/index.js'
+import { InputProvider } from '../../common/index.js'
 import {
   EncryptedShape,
   StandardShape,
@@ -61,32 +61,25 @@ const parsePair = (
 }
 
 const parseStrategyGuide = (
-  fileContents: string
-): Effect.Effect<never, string, List.List<[StandardShape, EncryptedOutcome]>> =>
-  pipe(
-    Effect.succeed(fileContents),
-    Effect.map(parseFileLines),
+  lines: string[]
+): Effect.Effect<never, string, [StandardShape, EncryptedOutcome][]> =>
+  Effect.succeed(lines).pipe(
     Effect.flatMap(lines =>
-      pipe(
-        lines,
-        List.map(line => pipe(line, parseLine, Effect.flatMap(parsePair))),
-        _ => Effect.all(_),
-        Effect.map(List.fromIterable)
+      Effect.all(
+        lines.map(line => parseLine(line).pipe(Effect.flatMap(parsePair)))
       )
     )
   )
 
 const toOldStrategyGuide = (
-  pairs: List.List<[StandardShape, EncryptedOutcome]>
-): List.List<[StandardShape, EncryptedShape]> =>
-  pipe(
-    pairs,
-    List.map(([shape, outcome]) => [shape, shapePrediction[shape][outcome]])
-  )
+  pairs: [StandardShape, EncryptedOutcome][]
+): [StandardShape, EncryptedShape][] =>
+  pairs.map(([shape, outcome]) => [shape, shapePrediction[shape][outcome]])
 
-export const program = pipe(
-  new URL('../part1/input.txt', import.meta.url),
-  parseFile,
+export const program = InputProvider.pipe(
+  Effect.flatMap(inputProvider =>
+    inputProvider.get(new URL('input.txt', import.meta.url))
+  ),
   Effect.flatMap(parseStrategyGuide),
   Effect.map(toOldStrategyGuide),
   Effect.map(computeFinalScore)
