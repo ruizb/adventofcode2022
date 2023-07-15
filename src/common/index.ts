@@ -1,10 +1,16 @@
 import { promises as fs } from 'node:fs'
-import { Effect, List } from 'effect'
+import { Context, Effect, List } from 'effect'
 
-export const parseFile = (path: string | URL) => {
-  return Effect.tryPromise(() => fs.readFile(path, 'utf-8'))
+export interface InputProvider {
+  readonly get: (filepath: URL) => Effect.Effect<never, unknown, string[]>
 }
 
-export const parseFileLines = (fileContents: string): List.List<string> => {
-  return List.fromIterable(fileContents.trimEnd().split('\n'))
-}
+export const InputProvider = Context.Tag<InputProvider>()
+
+export const InputProviderLive = InputProvider.of({
+  get: (filepath: URL) => {
+    return Effect.tryPromise(() => fs.readFile(filepath, 'utf-8')).pipe(
+      Effect.map(fileContents => fileContents.trimEnd().split('\n'))
+    )
+  },
+})
