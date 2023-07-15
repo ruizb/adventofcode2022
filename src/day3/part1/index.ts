@@ -3,7 +3,7 @@ import { InputProvider } from '../../common/index.js'
 
 const linePattern = /^[a-zA-Z]+$/
 
-const itemToPriority = Object.fromEntries(
+export const itemToPriority = Object.fromEntries(
   Chunk.makeBy(52, i => {
     if (i < 26) {
       return [String.fromCharCode(97 + i), i + 1]
@@ -14,12 +14,16 @@ const itemToPriority = Object.fromEntries(
 
 type Rucksack = [readonly string[], readonly string[]]
 
-const parseRucksack = (line: string): Effect.Effect<never, string, Rucksack> =>
+export const parseLine = (line: string) =>
   Effect.succeed(line).pipe(
     Effect.filterOrFail(
       line => linePattern.test(line),
       line => `Line has an invalid character: ${line}`
-    ),
+    )
+  )
+
+const parseRucksack = (line: string): Effect.Effect<never, string, Rucksack> =>
+  parseLine(line).pipe(
     Effect.filterOrFail(
       line => line.length % 2 === 0,
       line => `Line must have an even number of characters: ${line}`
