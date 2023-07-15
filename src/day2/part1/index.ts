@@ -1,13 +1,13 @@
 import { Effect, List, Number, String, Tuple, pipe } from 'effect'
 import { parseFile, parseFileLines } from '../../common/index.js'
 
-enum StandardShape {
+export enum StandardShape {
   Rock = 'A',
   Paper = 'B',
   Scissors = 'C',
 }
 
-enum EncryptedShape {
+export enum EncryptedShape {
   Rock = 'X',
   Paper = 'Y',
   Scissors = 'Z',
@@ -49,7 +49,7 @@ const scoresMatrix = {
   },
 } satisfies Record<StandardShape, Record<EncryptedShape, Outcome>>
 
-const parseLine = (
+export const parseLine = (
   line: string
 ): Effect.Effect<never, string, [string, string]> => {
   return pipe(
@@ -91,17 +91,9 @@ const parseShapesPair = (
   )
 }
 
-const computeScore = ([standard, encrypted]: [
-  StandardShape,
-  EncryptedShape,
-]): number => {
-  const outcome = scoresMatrix[standard][encrypted]
-  return outcomeScore[outcome] + shapeScore[encrypted]
-}
-
-export const computeFinalScore = (
+const parseStrategyGuide = (
   fileContents: string
-): Effect.Effect<never, string, number> =>
+): Effect.Effect<never, string, List.List<[StandardShape, EncryptedShape]>> =>
   pipe(
     Effect.succeed(fileContents),
     Effect.map(parseFileLines),
@@ -114,13 +106,24 @@ export const computeFinalScore = (
         _ => Effect.all(_),
         Effect.map(List.fromIterable)
       )
-    ),
-    Effect.map(List.map(computeScore)),
-    Effect.map(Number.sumAll)
+    )
   )
+
+const computeScore = ([standard, encrypted]: [
+  StandardShape,
+  EncryptedShape,
+]): number => {
+  const outcome = scoresMatrix[standard][encrypted]
+  return outcomeScore[outcome] + shapeScore[encrypted]
+}
+
+export const computeFinalScore = (
+  strategyGuide: List.List<[StandardShape, EncryptedShape]>
+): number => pipe(strategyGuide, List.map(computeScore), Number.sumAll)
 
 export const program = pipe(
   new URL('input.txt', import.meta.url),
   parseFile,
-  Effect.flatMap(computeFinalScore)
+  Effect.flatMap(parseStrategyGuide),
+  Effect.map(computeFinalScore)
 )
