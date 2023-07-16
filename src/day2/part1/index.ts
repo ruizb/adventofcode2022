@@ -1,4 +1,6 @@
-import { Effect, List, Number, String, Tuple, pipe } from 'effect'
+import { Effect, List, Number, String, Tuple } from 'effect'
+import * as S from '@effect/schema/Schema'
+import { ParseError } from '@effect/schema/ParseResult'
 import { InputProvider } from '../../common/index.js'
 
 export enum StandardShape {
@@ -51,46 +53,26 @@ const scoresMatrix = {
 
 export const parseLine = (
   line: string
-): Effect.Effect<never, string, [string, string]> =>
+): Effect.Effect<never, ParseError, [string, string]> =>
   Effect.succeed(line).pipe(
     Effect.map(String.split(' ')),
-    Effect.filterOrFail(
-      (elements): elements is [string, string] => elements.length === 2,
-      elements => `More than 2 elements on the same line: ${elements}`
-    )
+    Effect.flatMap(S.parse(S.array(S.string).pipe(S.itemsCount(2)))),
+    Effect.map(items => items as [string, string]) // itemsCount(2) gives `readonly string[]` instead of `readonly [string, string]`
   )
 
 const parseShapesPair = (
   shapesPair: [string, string]
-): Effect.Effect<never, string, [StandardShape, EncryptedShape]> =>
-  pipe(
-    shapesPair,
-    Tuple.mapBoth({
-      onFirst: rawShape =>
-        pipe(
-          Effect.succeed(rawShape),
-          Effect.filterOrFail(
-            (shape): shape is StandardShape =>
-              Object.values(StandardShape).includes(shape as any),
-            shape => `Unknown standard shape: ${shape}`
-          )
-        ),
-      onSecond: rawShape =>
-        pipe(
-          Effect.succeed(rawShape),
-          Effect.filterOrFail(
-            (shape): shape is EncryptedShape =>
-              Object.values(EncryptedShape).includes(shape as any),
-            shape => `Unknown encrypted shape: ${shape}`
-          )
-        ),
-    }),
-    _ => Effect.all(_)
+): Effect.Effect<never, ParseError, [StandardShape, EncryptedShape]> =>
+  Effect.all(
+    Tuple.mapBoth(shapesPair, {
+      onFirst: S.parse(S.enums(StandardShape)),
+      onSecond: S.parse(S.enums(EncryptedShape)),
+    })
   )
 
 const parseStrategyGuide = (
   lines: string[]
-): Effect.Effect<never, string, [StandardShape, EncryptedShape][]> =>
+): Effect.Effect<never, ParseError, [StandardShape, EncryptedShape][]> =>
   Effect.succeed(lines).pipe(
     Effect.flatMap(lines =>
       Effect.all(

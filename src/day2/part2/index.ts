@@ -1,4 +1,6 @@
-import { Effect, List, Tuple, pipe } from 'effect'
+import { Effect, Tuple } from 'effect'
+import * as S from '@effect/schema/Schema'
+import { ParseError } from '@effect/schema/ParseResult'
 import { InputProvider } from '../../common/index.js'
 import {
   EncryptedShape,
@@ -33,36 +35,17 @@ const shapePrediction = {
 
 const parsePair = (
   pair: [string, string]
-): Effect.Effect<never, string, [StandardShape, EncryptedOutcome]> => {
-  return pipe(
-    pair,
-    Tuple.mapBoth({
-      onFirst: rawShape =>
-        pipe(
-          Effect.succeed(rawShape),
-          Effect.filterOrFail(
-            (shape): shape is StandardShape =>
-              Object.values(StandardShape).includes(shape as any),
-            shape => `Unknown standard shape: ${shape}`
-          )
-        ),
-      onSecond: rawOutcome =>
-        pipe(
-          Effect.succeed(rawOutcome),
-          Effect.filterOrFail(
-            (outcome): outcome is EncryptedOutcome =>
-              Object.values(EncryptedOutcome).includes(outcome as any),
-            outcome => `Unknown encrypted outcome: ${outcome}`
-          )
-        ),
-    }),
-    _ => Effect.all(_)
+): Effect.Effect<never, ParseError, [StandardShape, EncryptedOutcome]> =>
+  Effect.all(
+    Tuple.mapBoth(pair, {
+      onFirst: S.parse(S.enums(StandardShape)),
+      onSecond: S.parse(S.enums(EncryptedOutcome)),
+    })
   )
-}
 
 const parseStrategyGuide = (
   lines: string[]
-): Effect.Effect<never, string, [StandardShape, EncryptedOutcome][]> =>
+): Effect.Effect<never, ParseError, [StandardShape, EncryptedOutcome][]> =>
   Effect.succeed(lines).pipe(
     Effect.flatMap(lines =>
       Effect.all(
