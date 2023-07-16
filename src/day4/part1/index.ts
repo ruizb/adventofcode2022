@@ -3,7 +3,7 @@ import * as S from '@effect/schema/Schema'
 import { ParseError } from '@effect/schema/ParseResult'
 import { InputProvider } from '../../common/index.js'
 
-type Pair = S.To<typeof Pair>
+export type Pair = S.To<typeof Pair>
 type Assignment = S.To<typeof Assignment>
 
 const linePattern = /^\d+-\d+,\d+-\d+$/
@@ -11,7 +11,9 @@ const linePattern = /^\d+-\d+,\d+-\d+$/
 const Assignment = S.tuple(S.number, S.number)
 const Pair = S.tuple(Assignment, Assignment)
 
-const parseLine = (line: string): Effect.Effect<never, ParseError, Pair> =>
+export const parseLine = (
+  line: string
+): Effect.Effect<never, ParseError, Pair> =>
   pipe(
     line,
     S.parse(
