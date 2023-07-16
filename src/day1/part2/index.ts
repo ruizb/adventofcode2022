@@ -9,13 +9,13 @@ const getTop3Values = (chunks: Chunk.Chunk<number>): Chunk.Chunk<number> => {
 }
 
 const computeTop3MaxCalories = (lines: string[]) => {
-  return regroupCaloriesLines(lines).pipe(getTop3Values)
+  return regroupCaloriesLines(lines).pipe(Effect.map(getTop3Values))
 }
 
 export const program = InputProvider.pipe(
   Effect.flatMap(inputProvider =>
     inputProvider.get(new URL('input.txt', import.meta.url))
   ),
-  Effect.map(computeTop3MaxCalories),
+  Effect.flatMap(computeTop3MaxCalories),
   Effect.map(Number.sumAll)
 )
