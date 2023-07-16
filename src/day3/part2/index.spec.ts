@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { program } from './index.js'
 import { Effect } from 'effect'
 import { InputProvider } from '../../common/index.js'
+import { expectParseError } from '../../../test/util.js'
 
 describe('Day 3 part 2', () => {
   it('should solve example puzzle', () => {
@@ -38,7 +39,8 @@ describe('Day 3 part 2', () => {
       })
     )
 
-    expect(() => Effect.runSync(runnable)).toThrow(
+    expectParseError(
+      runnable,
       'Expected to find 1 common item in the group: a,r'
     )
   })

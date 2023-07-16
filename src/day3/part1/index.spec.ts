@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { program } from './index.js'
 import { Effect } from 'effect'
+import { ParseError } from '@effect/schema/ParseResult'
 import { InputProvider } from '../../common/index.js'
+import { expectParseError } from '../../../test/util.js'
 
 describe('Day 3 part 1', () => {
   it('should solve example puzzle', () => {
@@ -38,7 +40,8 @@ describe('Day 3 part 1', () => {
       })
     )
 
-    expect(() => Effect.runSync(runnable)).toThrow(
+    expectParseError(
+      runnable,
       'Line has an invalid character: jqHRNqRjqzjG_DLGLrsFMfFZSrLrFZsSL'
     )
   })
@@ -57,7 +60,8 @@ describe('Day 3 part 1', () => {
       })
     )
 
-    expect(() => Effect.runSync(runnable)).toThrow(
+    expectParseError(
+      runnable,
       'Line must have an even number of characters: jqHRNqRjqzjGDLGLrsFMfFZSrLrjFZsSL'
     )
   })
@@ -76,9 +80,7 @@ describe('Day 3 part 1', () => {
       })
     )
 
-    expect(() => Effect.runSync(runnable)).toThrow(
-      'Expected to find 1 error item: '
-    )
+    expectParseError(runnable, 'Expected to find 1 error item: ')
   })
 
   it('should detect a line that has multiple error items', () => {
@@ -95,8 +97,6 @@ describe('Day 3 part 1', () => {
       })
     )
 
-    expect(() => Effect.runSync(runnable)).toThrow(
-      'Expected to find 1 error item: j,L'
-    )
+    expectParseError(runnable, 'Expected to find 1 error item: j,L')
   })
 })

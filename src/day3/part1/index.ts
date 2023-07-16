@@ -1,4 +1,6 @@
 import { Chunk, Effect, Number, Tuple, pipe } from 'effect'
+import * as S from '@effect/schema/Schema'
+import { ParseError } from '@effect/schema/ParseResult'
 import { InputProvider } from '../../common/index.js'
 
 const linePattern = /^[a-zA-Z]+$/
@@ -14,20 +16,21 @@ export const itemToPriority = Object.fromEntries(
 
 type Rucksack = [readonly string[], readonly string[]]
 
-export const parseLine = (line: string) =>
-  Effect.succeed(line).pipe(
-    Effect.filterOrFail(
-      line => linePattern.test(line),
-      line => `Line has an invalid character: ${line}`
-    )
-  )
+const validLineSchema = S.string.pipe(
+  S.filter(line => linePattern.test(line), {
+    message: line => `Line has an invalid character: ${line}`,
+  }),
+  S.filter(line => line.length % 2 === 0, {
+    message: line => `Line must have an even number of characters: ${line}`,
+  })
+)
 
-const parseRucksack = (line: string): Effect.Effect<never, string, Rucksack> =>
+export const parseLine = S.parse(validLineSchema)
+
+const parseRucksack = (
+  line: string
+): Effect.Effect<never, ParseError, Rucksack> =>
   parseLine(line).pipe(
-    Effect.filterOrFail(
-      line => line.length % 2 === 0,
-      line => `Line must have an even number of characters: ${line}`
-    ),
     Effect.map(line =>
       Chunk.fromIterable(line).pipe(
         Chunk.splitAt(line.length / 2),
@@ -41,7 +44,7 @@ const parseRucksack = (line: string): Effect.Effect<never, string, Rucksack> =>
 
 const findErrorItem = ([compartment1, compartment2]: Rucksack): Effect.Effect<
   never,
-  string,
+  ParseError,
   string
 > =>
   Chunk.intersection(
@@ -49,11 +52,13 @@ const findErrorItem = ([compartment1, compartment2]: Rucksack): Effect.Effect<
     Chunk.fromIterable(compartment2)
   ).pipe(
     // A compartment may contain multiple occurrences of the same error item
-    chunk => new Set(Chunk.toReadonlyArray(chunk)),
-    Effect.succeed,
-    Effect.filterOrFail(
-      set => set.size === 1,
-      set => `Expected to find 1 error item: ${[...set]}`
+    Chunk.toReadonlyArray,
+    S.parse(
+      S.readonlySet(S.string).pipe(
+        S.filter(set => set.size === 1, {
+          message: set => `Expected to find 1 error item: ${[...set]}`,
+        })
+      )
     ),
     Effect.map(set => [...set][0])
   )
