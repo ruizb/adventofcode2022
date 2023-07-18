@@ -11,7 +11,7 @@ import {
   invalidCrateSlotFailure,
 } from './domain.js'
 
-const splitInput = (
+export const splitInput = (
   lines: string[]
 ): [crates: Chunk.Chunk<string>, procedure: Chunk.Chunk<string>] =>
   Chunk.fromIterable(lines).pipe(
@@ -103,29 +103,34 @@ const setupStacks = (
 const parseProcedureLine = (line: string): ParseResult<ProcedureStep> =>
   S.parse(ProcedureStep)(line)
 
-const applyProcedureStep = (
-  stacks: Chunk.Chunk<Chunk.Chunk<string>>,
-  step: ProcedureStep
-): Chunk.Chunk<Chunk.Chunk<string>> => {
-  const fromStack = Chunk.unsafeGet(stacks, step.from)
-  const toStack = Chunk.unsafeGet(stacks, step.to)
+export const applyProcedureStep =
+  (applyReverse: boolean) =>
+  (
+    stacks: Chunk.Chunk<Chunk.Chunk<string>>,
+    step: ProcedureStep
+  ): Chunk.Chunk<Chunk.Chunk<string>> => {
+    const fromStack = Chunk.unsafeGet(stacks, step.from)
+    const toStack = Chunk.unsafeGet(stacks, step.to)
 
-  const cratesToMove = Chunk.takeRight(fromStack, step.quantity)
-  const nextFromStack = Chunk.dropRight(fromStack, step.quantity)
-  const nextToStack = Chunk.appendAll(toStack, Chunk.reverse(cratesToMove))
+    const cratesToMove = Chunk.takeRight(fromStack, step.quantity)
+    const nextFromStack = Chunk.dropRight(fromStack, step.quantity)
+    const nextToStack = Chunk.appendAll(
+      toStack,
+      applyReverse ? Chunk.reverse(cratesToMove) : cratesToMove
+    )
 
-  return Chunk.modify(stacks, step.from, () => nextFromStack).pipe(
-    Chunk.modify(step.to, () => nextToStack)
-  )
-}
+    return Chunk.modify(stacks, step.from, () => nextFromStack).pipe(
+      Chunk.modify(step.to, () => nextToStack)
+    )
+  }
 
-const getTopCratesMessage = (stacks: Chunk.Chunk<Stack>): string =>
+export const getTopCratesMessage = (stacks: Chunk.Chunk<Stack>): string =>
   Chunk.map(stacks, Chunk.last).pipe(
     Chunk.map(Option.getOrElse(() => '')),
     Chunk.join('')
   )
 
-const setupStacksAndProcedureSteps: (
+export const setupStacksAndProcedureSteps: (
   input: [crates: Chunk.Chunk<string>, procedure: Chunk.Chunk<string>]
 ) => [
   ParseResult<Chunk.Chunk<Stack>>,
@@ -150,7 +155,7 @@ export const program = InputProvider.pipe(
   Effect.map(setupStacksAndProcedureSteps),
   Effect.flatMap(_ => Effect.all(_)),
   Effect.map(([stacks, procedureSteps]) =>
-    Chunk.reduce(procedureSteps, stacks, applyProcedureStep)
+    Chunk.reduce(procedureSteps, stacks, applyProcedureStep(true))
   ),
   Effect.map(getTopCratesMessage)
 )
