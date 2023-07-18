@@ -1,39 +1,15 @@
-import { Chunk, Effect, Option, Tuple } from 'effect'
+import { Chunk, Effect, Option, Tuple, pipe } from 'effect'
 import * as S from '@effect/schema/Schema'
 import { ParseResult } from '@effect/schema/ParseResult'
 import { InputProvider } from '../../common/index.js'
-
-type ProcedureStep = S.To<typeof ProcedureStep>
-
-const ProcedureStep = S.struct({
-  quantity: S.number,
-  from: S.number,
-  to: S.number,
-})
-
-const procedureStepPattern = /^move (\d+) from (\d) to (\d)$/
-
-const ProcedureStepSchema = S.transform(
-  S.string.pipe(
-    S.filter(line => procedureStepPattern.test(line), {
-      message: line => `Invalid pattern for line: ${line}`,
-    })
-  ),
+import {
+  Crate,
+  CrateSlot,
+  ParsedStack,
   ProcedureStep,
-  line => {
-    const [, quantity, from, to] = line.match(
-      procedureStepPattern
-    ) as RegExpMatchArray
-
-    // Assumption: extracted values are valid numbers
-    return {
-      quantity: parseInt(quantity, 10),
-      from: parseInt(from, 10) - 1, // transform stackId into index
-      to: parseInt(to, 10) - 1,
-    }
-  },
-  () => 'not implemented'
-)
+  Stack,
+  invalidCrateSlotFailure,
+} from './domain.js'
 
 const splitInput = (
   lines: string[]
@@ -45,12 +21,11 @@ const splitInput = (
     )
   )
 
-// Assumption: crates are composed of 3 characters: "[x]", where "x" can be any A-Z letter
-const parseStackLine = (line: string): Chunk.Chunk<Option.Option<string>> => {
+const parseStackLine = (line: string): ParseResult<ParsedStack> => {
   const loop = (
-    result: Chunk.Chunk<Option.Option<string>>,
+    result: ParseResult<ParsedStack>,
     state: Chunk.Chunk<string>
-  ): Chunk.Chunk<Option.Option<string>> => {
+  ): ParseResult<ParsedStack> => {
     if (Chunk.isEmpty(state)) {
       return result
     }
@@ -58,54 +33,67 @@ const parseStackLine = (line: string): Chunk.Chunk<Option.Option<string>> => {
     const [crate, nextState] = state.pipe(
       Chunk.splitAt(3),
       Tuple.mapBoth({
-        onFirst: ([_, crateId]) =>
-          crateId === ' ' ? Option.none() : Option.some(crateId),
+        onFirst: tuple =>
+          pipe(
+            Chunk.toReadonlyArray(tuple),
+            S.parse(CrateSlot),
+            Effect.orElse(() => invalidCrateSlotFailure(tuple)),
+            Effect.map(crateSlot =>
+              S.is(Crate)(crateSlot)
+                ? Option.some(crateSlot[1])
+                : Option.none<string>()
+            )
+          ),
         onSecond: Chunk.drop(1),
       })
     )
 
-    return loop(Chunk.append(result, crate), nextState)
+    return Effect.flatMap(crate, crate =>
+      loop(Effect.map(result, Chunk.append(crate)), nextState)
+    )
   }
 
-  return loop(Chunk.empty<Option.Option<string>>(), Chunk.fromIterable(line))
+  return loop(
+    Effect.succeed(Chunk.empty<Option.Option<string>>()),
+    Chunk.fromIterable(line)
+  )
 }
 
-// Assumption: stacks are sorted ASC horizontally (i.e. " 1   2   3 ...")
-// Assumption: stackLines contains at least 2 lines
+const getChunkOrEmpty: <A>(
+  chunk: Option.Option<Chunk.Chunk<A>>
+) => Chunk.Chunk<A> = Option.getOrElse(() => Chunk.empty())
+
+// Assumption: stacks are sorted ASC horizontally, 1-9 (i.e. " 1   2   3 ...")
 const setupStacks = (
-  stackLines: Chunk.Chunk<Chunk.Chunk<Option.Option<string>>>
-) => {
+  stackLines: Chunk.Chunk<ParsedStack>
+): Chunk.Chunk<Stack> => {
   const loop = (
-    result: Chunk.Chunk<Chunk.Chunk<string>>,
-    state: Chunk.Chunk<Chunk.Chunk<Option.Option<string>>>
-  ): Chunk.Chunk<Chunk.Chunk<string>> => {
+    result: Chunk.Chunk<Stack>,
+    state: Chunk.Chunk<ParsedStack>
+  ): Chunk.Chunk<Stack> => {
     if (Chunk.isEmpty(state)) {
       return result
     }
 
     const nextResult = Chunk.reduce(
-      Chunk.unsafeHead(state),
+      Chunk.head(state).pipe(getChunkOrEmpty),
       result,
-      (accResult, crate, index) =>
-        Option.match(crate, {
-          onNone: () => accResult,
-          onSome: crateId =>
-            Chunk.modify(accResult, index, Chunk.prepend(crateId)),
+      (stack, crateOrEmptySlot, index) =>
+        Option.match(crateOrEmptySlot, {
+          onNone: () => stack,
+          onSome: crateId => Chunk.modify(stack, index, Chunk.prepend(crateId)),
         })
     )
 
-    const nextState = Chunk.tail(state).pipe(
-      Option.getOrElse(() => Chunk.empty())
-    )
+    const nextState = Chunk.tail(state).pipe(getChunkOrEmpty)
 
     return loop(nextResult, nextState)
   }
 
-  // remove the line with stack IDs
-  const initialState = Chunk.dropRight(stackLines, 1)
+  const initialState = stackLines
 
   const initialResult = Chunk.makeBy(
-    Chunk.size(Chunk.unsafeHead(initialState)),
+    Chunk.size(Chunk.head(initialState).pipe(getChunkOrEmpty)),
     () => Chunk.empty<string>()
   )
 
@@ -113,7 +101,7 @@ const setupStacks = (
 }
 
 const parseProcedureLine = (line: string): ParseResult<ProcedureStep> =>
-  S.parse(ProcedureStepSchema)(line)
+  S.parse(ProcedureStep)(line)
 
 const applyProcedureStep = (
   stacks: Chunk.Chunk<Chunk.Chunk<string>>,
@@ -131,34 +119,38 @@ const applyProcedureStep = (
   )
 }
 
-const getTopCratesMessage = (
-  stacks: Chunk.Chunk<Chunk.Chunk<string>>
-): string =>
+const getTopCratesMessage = (stacks: Chunk.Chunk<Stack>): string =>
   Chunk.map(stacks, Chunk.last).pipe(
     Chunk.map(Option.getOrElse(() => '')),
     Chunk.join('')
   )
+
+const setupStacksAndProcedureSteps: (
+  input: [crates: Chunk.Chunk<string>, procedure: Chunk.Chunk<string>]
+) => [
+  ParseResult<Chunk.Chunk<Stack>>,
+  ParseResult<Chunk.Chunk<ProcedureStep>>,
+] = Tuple.mapBoth({
+  onFirst: lines =>
+    Effect.all(Chunk.map(Chunk.dropRight(lines, 1), parseStackLine)).pipe(
+      Effect.map(Chunk.fromIterable),
+      Effect.map(setupStacks)
+    ),
+  onSecond: lines =>
+    Effect.all(Chunk.map(lines, parseProcedureLine)).pipe(
+      Effect.map(Chunk.fromIterable)
+    ),
+})
 
 export const program = InputProvider.pipe(
   Effect.flatMap(inputProvider =>
     inputProvider.get(new URL('input.txt', import.meta.url))
   ),
   Effect.map(splitInput),
-  Effect.flatMap(input =>
-    Effect.all(
-      Tuple.mapBoth(input, {
-        onFirst: lines =>
-          Chunk.map(lines, parseStackLine)
-            .pipe(setupStacks)
-            .pipe(Effect.succeed),
-        onSecond: lines => Effect.all(Chunk.map(lines, parseProcedureLine)),
-      })
-    )
-  ),
+  Effect.map(setupStacksAndProcedureSteps),
+  Effect.flatMap(_ => Effect.all(_)),
   Effect.map(([stacks, procedureSteps]) =>
-    Chunk.fromIterable(procedureSteps).pipe(
-      Chunk.reduce(stacks, applyProcedureStep)
-    )
+    Chunk.reduce(procedureSteps, stacks, applyProcedureStep)
   ),
   Effect.map(getTopCratesMessage)
 )

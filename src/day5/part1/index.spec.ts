@@ -28,6 +28,29 @@ describe('Day 5 part 1', () => {
     expect(Effect.runSync(runnable)).toEqual('CMZ')
   })
 
+  it('should detect invalid crate', () => {
+    const runnable = Effect.provideService(
+      program,
+      InputProvider,
+      InputProvider.of({
+        get: () =>
+          Effect.succeed([
+            '    [D]    ',
+            '[N] [Cx]    ',
+            '[Z] [M] [P]',
+            ' 1   2   3 ',
+            '',
+            'move 1 from 2 to 1',
+          ]),
+      })
+    )
+
+    expectParseError(
+      runnable,
+      'Invalid text format for crate slot, got: "[Cx", expected: "[X]" or "   "'
+    )
+  })
+
   it('should detect invalid procedure line', () => {
     const runnable = Effect.provideService(
       program,
