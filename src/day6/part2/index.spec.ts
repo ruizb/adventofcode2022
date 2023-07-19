@@ -4,15 +4,21 @@ import { Effect } from 'effect'
 import { InputProvider } from '../../common/index.js'
 
 describe('Day 6 part 2', () => {
-  it('should solve example puzzle', () => {
+  it.each([
+    ['mjqjpqmgbljsphdztnvjfqwrcgsmlb', 19],
+    ['bvwbjplbgvbhsrlpgdmjqwftvncz', 23],
+    ['nppdvjthqldpwncqszvftbrmjlhg', 23],
+    ['nznrnfrfntjfmvfwmzdfjlvtqnbhcprsg', 29],
+    ['zcfzfwzzqfrljwzlrfnpqdbhtmscgvjw', 26],
+  ] as const)('should solve example puzzles', (puzzle, expectedValue) => {
     const runnable = Effect.provideService(
       program,
       InputProvider,
       InputProvider.of({
-        get: () => Effect.succeed([]),
+        get: () => Effect.succeed([puzzle]),
       })
     )
 
-    expect(Effect.runSync(runnable)).toEqual(42)
+    expect(Effect.runSync(runnable)).toEqual(expectedValue)
   })
 })

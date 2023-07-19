@@ -6,42 +6,47 @@ const isMarker = (candidate: Chunk.Chunk<string>): boolean => {
   return Chunk.size(candidate) === uniqueItems.size
 }
 
-const findMarker = (
-  input: Chunk.Chunk<string>
-): Effect.Effect<never, string, number> => {
-  if (Chunk.size(input) < 4) {
-    return Effect.fail('Input has less than 4 characters')
-  }
-
-  const loop = (
-    nthChar: number,
-    candidate: Chunk.Chunk<string>,
-    remainingChars: Chunk.Chunk<string>
-  ): Effect.Effect<never, string, number> => {
-    if (isMarker(candidate)) {
-      return Effect.succeed(nthChar)
+export const findMarker =
+  (distinctCharsCount: number) =>
+  (input: Chunk.Chunk<string>): Effect.Effect<never, string, number> => {
+    if (Chunk.size(input) < distinctCharsCount) {
+      return Effect.fail(`Input has less than ${distinctCharsCount} characters`)
     }
 
-    if (Chunk.isEmpty(remainingChars)) {
-      return Effect.fail('Could not find marker')
+    const loop = (
+      nthChar: number,
+      candidate: Chunk.Chunk<string>,
+      remainingChars: Chunk.Chunk<string>
+    ): Effect.Effect<never, string, number> => {
+      if (isMarker(candidate)) {
+        return Effect.succeed(nthChar)
+      }
+
+      if (Chunk.isEmpty(remainingChars)) {
+        return Effect.fail('Could not find marker')
+      }
+
+      const nextChar = Chunk.headNonEmpty(
+        remainingChars as Chunk.NonEmptyChunk<string>
+      )
+      const nextCandidate = Chunk.drop(candidate, 1).pipe(
+        Chunk.append(nextChar)
+      )
+      const nextRemainingChars = Chunk.tail(remainingChars).pipe(
+        Option.getOrElse(() => Chunk.empty())
+      )
+      const nextNthChar = nthChar + 1
+
+      return loop(nextNthChar, nextCandidate, nextRemainingChars)
     }
 
-    const nextChar = Chunk.headNonEmpty(
-      remainingChars as Chunk.NonEmptyChunk<string>
+    const [initialCandidate, initialRemainingChars] = Chunk.splitAt(
+      input,
+      distinctCharsCount
     )
-    const nextCandidate = Chunk.drop(candidate, 1).pipe(Chunk.append(nextChar))
-    const nextRemainingChars = Chunk.tail(remainingChars).pipe(
-      Option.getOrElse(() => Chunk.empty())
-    )
-    const nextNthChar = nthChar + 1
 
-    return loop(nextNthChar, nextCandidate, nextRemainingChars)
+    return loop(distinctCharsCount, initialCandidate, initialRemainingChars)
   }
-
-  const [initialCandidate, initialRemainingChars] = Chunk.splitAt(input, 4)
-
-  return loop(4, initialCandidate, initialRemainingChars)
-}
 
 export const program = InputProvider.pipe(
   Effect.flatMap(inputProvider =>
@@ -54,5 +59,5 @@ export const program = InputProvider.pipe(
   ),
   Effect.map(Chunk.headNonEmpty),
   Effect.map(Chunk.fromIterable), // get list of characters
-  Effect.flatMap(findMarker)
+  Effect.flatMap(findMarker(4))
 )
