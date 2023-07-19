@@ -2,8 +2,8 @@ import { Chunk, Effect, Option, Tuple } from 'effect'
 import { InputProvider } from '../../common/index.js'
 
 const isMarker = (candidate: Chunk.Chunk<string>): boolean => {
-  const [a, b, c, d] = Chunk.toReadonlyArray(candidate)
-  return a !== b && a !== c && a !== d && b !== c && b !== d && c !== d
+  const uniqueItems = new Set(Chunk.toReadonlyArray(candidate))
+  return Chunk.size(candidate) === uniqueItems.size
 }
 
 const findMarker = (
@@ -47,6 +47,12 @@ export const program = InputProvider.pipe(
   Effect.flatMap(inputProvider =>
     inputProvider.get(new URL('input.txt', import.meta.url))
   ),
-  Effect.map(lines => Chunk.fromIterable(lines[0])),
+  Effect.map(Chunk.fromIterable),
+  Effect.filterOrFail(
+    Chunk.isNonEmpty,
+    lines => `Expected input to have 1 line, got: ${Chunk.size(lines)}`
+  ),
+  Effect.map(Chunk.headNonEmpty),
+  Effect.map(Chunk.fromIterable), // get list of characters
   Effect.flatMap(findMarker)
 )
