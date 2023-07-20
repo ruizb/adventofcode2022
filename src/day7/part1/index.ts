@@ -2,14 +2,7 @@ import { Chunk, Effect, HashMap, Number, Option, Struct } from 'effect'
 import * as S from '@effect/schema/Schema'
 import { ParseResult } from '@effect/schema/ParseResult'
 import { InputProvider } from '../../common/index.js'
-import {
-  Command,
-  Directory,
-  File,
-  Line,
-  ListOutput,
-  SupportedCommand,
-} from './domain.js'
+import { Command, Line, ListOutput, SupportedCommand } from './domain.js'
 
 const getChunkOrEmpty = <A>(
   chunk: Option.Option<Chunk.Chunk<A>>
@@ -52,7 +45,7 @@ const parseLine = (line: string): ParseResult<Line> =>
 //   })
 // }
 
-const computeTotalSizes = (
+export const computeTotalSizes = (
   lines: Chunk.Chunk<string>
 ): ParseResult<HashMap.HashMap<string, number>> => {
   const loop = (
