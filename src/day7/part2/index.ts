@@ -10,15 +10,6 @@ const computeAnswer = (totalSizes: HashMap.HashMap<string, number>): number =>
     HashMap.filter(
       Number.greaterThanOrEqualTo(getMinimumSizeToFree(totalSizes))
     ),
-    x => {
-      console.log(
-        '>>>',
-        getUnusedSpace(totalSizes),
-        getMinimumSizeToFree(totalSizes),
-        x
-      )
-      return x
-    },
     HashMap.values,
     Chunk.fromIterable,
     Chunk.sort(Number.Order),
