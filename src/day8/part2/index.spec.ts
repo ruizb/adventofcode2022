@@ -9,10 +9,11 @@ describe('Day 8 part 2', () => {
       program,
       InputProvider,
       InputProvider.of({
-        get: () => Effect.succeed([]),
+        get: () =>
+          Effect.succeed(['30373', '25512', '65332', '33549', '35390']),
       })
     )
 
-    expect(Effect.runSync(runnable)).toEqual(42)
+    expect(Effect.runSync(runnable)).toEqual(8)
   })
 })

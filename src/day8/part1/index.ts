@@ -1,19 +1,19 @@
 import { Chunk, Effect, Number, Option, Struct, Tuple, pipe } from 'effect'
 import { InputProvider } from '../../common/index.js'
 
-type TreeLine = Chunk.Chunk<number>
+export type TreeLine = Chunk.Chunk<number>
 
-interface Grid {
+export interface Grid {
   readonly horizontalLines: Chunk.Chunk<TreeLine>
   readonly verticalLines: Chunk.Chunk<TreeLine>
 }
 
-const emptyGrid: Grid = {
+export const emptyGrid: Grid = {
   horizontalLines: Chunk.empty<TreeLine>(),
   verticalLines: Chunk.empty<TreeLine>(),
 }
 
-const buildGrid = (result: Grid, line: string): Grid => {
+export const buildGrid = (result: Grid, line: string): Grid => {
   // Assumption: the line is only composed of digits
   const horizontalTrees = Chunk.fromIterable(line).pipe(
     Chunk.map(_ => parseInt(_, 10))
